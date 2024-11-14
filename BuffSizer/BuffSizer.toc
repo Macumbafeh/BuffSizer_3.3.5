@@ -1,0 +1,12 @@
+## Interface: 30300
+## Title: BuffSizer
+## Notes: Small addon for sizing the default (de-)buffs
+## Version: 0.1-Beta
+## Author: XiconQoo, DnB_Junkee, Knall
+## X-Email: contact me on discord Knall#1751
+## SavedVariables: BuffSizerDB
+
+embeds.xml
+
+BuffSizer.lua
+Lang.lua
