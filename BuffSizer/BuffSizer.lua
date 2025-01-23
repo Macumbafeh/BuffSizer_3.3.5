@@ -25,7 +25,7 @@ local BuffSizer = LibStub:NewLibrary(MAJOR, MINOR)
 BuffSizer.defaults = {
 	profile = {
 		--target
-		targetHighlightStealable = false,
+		targetHighlightStealable = true,
 		targetBuffSize = 25,
 		targetBuffMaxWidth = 122,
 		targetDebuffSize = 25,
@@ -64,6 +64,8 @@ function BuffSizer:Debug(...)
 	end
 	DEFAULT_CHAT_FRAME:AddMessage(text)
 end
+
+
 
 BuffSizer.events = CreateFrame("Frame")
 function BuffSizer.events:OnEvent(event, ...)
@@ -487,71 +489,95 @@ end
 
 local TargetFrame_UpdateBuffAnchor_old = TargetFrame_UpdateBuffAnchor
 TargetFrame_UpdateBuffAnchor = function(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
-	if not validUnits[self.unit] then
-		TargetFrame_UpdateBuffAnchor_old(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
-		return
-	end
-	local point, relativePoint, startY, startX, auraOffsetY, factor, relativeFrame
-	point, relativePoint, startY, startX, auraOffsetY, offsetY, size, factor, relativeFrame = determinePoints(self, offsetX, offsetY, "Buff", numDebuffs)
+    -- Only override for target/focus frames
+    if not validUnits[self.unit] then
+        return TargetFrame_UpdateBuffAnchor_old(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
+    end
 
-	local buff = getglobal(buffName..index);
-	local _, _, _, debuffType, _, _, caster, isStealable = UnitBuff(self.unit, index, "INCLUDE_NAME_PLATE_ONLY")
-	local buffSize = caster == "player" and size * factor or size
-	offsetX = BuffSizer.db.debuffOffset
+    -- Calculate anchor info (same as before)
+    local point, relativePoint, startY, startX, auraOffsetY, offsetY, baseSize, factor, relativeFrame
+    point, relativePoint, startY, startX, auraOffsetY, offsetY, baseSize, factor, relativeFrame =
+        determinePoints(self, offsetX, offsetY, "Buff", numDebuffs)
 
+    local buff = _G[buffName..index]
+    -- IMPORTANT: get the Stealable border texture here:
+    local frameStealable = _G[buffName..index.."Stealable"]  
 
-	if ( index == 1 ) then
-		self.buffRowWidth = buffSize
-		self.buffNewRowIndex = 1
-		self.buffRowCount = 1
-		buff:ClearAllPoints()
-		self.buffs:ClearAllPoints()
-		buff:SetPoint(point.."LEFT", relativeFrame, relativePoint.."LEFT", startX, startY)
-		self.buffs:SetPoint(point.."LEFT", buff, point.."LEFT", 0, 0)
-		self.buffs:SetPoint(relativePoint.."LEFT", buff, relativePoint.."LEFT", 0, -auraOffsetY)
-		self.spellbarAnchor2 = determineSpellbarAnchor(self, buff, "Buff", numDebuffs)
-	elseif ( self.buffRowWidth + buffSize > BuffSizer.db[self.unit .. "BuffMaxWidth"]
-			-- ToT visible and first line
-			or BuffSizer.db[self.unit .. "BuffPosition"] == "BOTTOM" and self.buffRowCount == 1 and self.haveToT and self.buffRowWidth + BuffSizer.db.buffOffset + buffSize > TOT_AURA_ROW_WIDTH and self == relativeFrame
-			-- ToT visible and and not first line and last lines dont exceed ToT height
-			or BuffSizer.db[self.unit .. "BuffPosition"] == "BOTTOM" and self.haveToT and self.buffRowCount > 1 and (self.buffRowCount - 1) * size * factor < 35 and self.buffRowWidth + BuffSizer.db.buffOffset + buffSize > TOT_AURA_ROW_WIDTH) then
-		-- new row
-		buff:ClearAllPoints()
-		buff:SetPoint(point.."LEFT", getglobal(buffName..self.buffNewRowIndex), relativePoint.."LEFT", 0, -offsetY)
-		self.buffRowCount = self.buffRowCount + 1
-		self.buffNewRowIndex = index
-		self.buffRowWidth = buffSize
-		self.buffs:ClearAllPoints()
-		self.buffs:SetPoint(relativePoint.."LEFT", buff, relativePoint.."LEFT", 0, -auraOffsetY)
-		self.spellbarAnchor2 = determineSpellbarAnchor(self, buff, "Buff", numDebuffs)
-	else
-		-- anchor to previous
-		self.buffRowWidth = self.buffRowWidth + buffSize + BuffSizer.db.buffOffset
-		buff:ClearAllPoints()
-		buff:SetPoint(point.."LEFT", getglobal(buffName..(index - 1)), point.."RIGHT", BuffSizer.db.buffOffset, 0)
-	end
-	BuffSizer:Debug(index, self.buffRowWidth )
+    -- If "INCLUDE_NAME_PLATE_ONLY" isn’t recognized on your 3.3.5 server, remove or replace that.
+    local name, rank, icon, count, debuffType, duration, expirationTime, caster, isStealable = UnitBuff(self.unit, index)
+    if not icon then
+        -- No buff at this index; default code would do: buff:Hide()
+        buff:Hide()
+        return
+    end
 
-	if (UnitIsEnemy("player", self.unit) and isStealable and debuffType == 'Magic' and BuffSizer.db[self.unit .. "HighlightStealable"]) then
-	--if true and index < 3 then
-		local frameStealable = getglobal(buffName..index.."Stealable")
-		if frameStealable then
-			frameStealable:Show()
-			frameStealable:SetWidth(buffSize + buffSize / 7)
-			frameStealable:SetHeight(buffSize + buffSize / 7)
-		end
-	end
+    -- Enlarge buffs cast by the player
+    local buffSize = (caster == "player") and baseSize * factor or baseSize
+    offsetX = BuffSizer.db.debuffOffset
 
-	-- Resize
-	buff:SetWidth(buffSize)
-	buff:SetHeight(buffSize)
+    -- =================================
+    --  Positioning/anchor logic, as before
+    -- =================================
+    if (index == 1) then
+        self.buffRowWidth = buffSize
+        self.buffNewRowIndex = 1
+        self.buffRowCount = 1
+        buff:ClearAllPoints()
+        self.buffs:ClearAllPoints()
+        buff:SetPoint(point.."LEFT", relativeFrame, relativePoint.."LEFT", startX, startY)
+        self.buffs:SetPoint(point.."LEFT", buff, point.."LEFT", 0, 0)
+        self.buffs:SetPoint(relativePoint.."LEFT", buff, relativePoint.."LEFT", 0, -auraOffsetY)
 
-	local border = getglobal(buffName..index.."Border")
-	if (border ~= nil) then
-		border:SetWidth(buffSize +2)
-		border:SetHeight(buffSize +2)
-	end
+        self.spellbarAnchor2 = determineSpellbarAnchor(self, buff, "Buff", numDebuffs)
+    elseif ( self.buffRowWidth + buffSize > BuffSizer.db[self.unit .. "BuffMaxWidth"] ) then
+        -- Start a new row
+        buff:ClearAllPoints()
+        buff:SetPoint(point.."LEFT", _G[buffName..self.buffNewRowIndex], relativePoint.."LEFT", 0, -offsetY)
+        self.buffRowCount = self.buffRowCount + 1
+        self.buffNewRowIndex = index
+        self.buffRowWidth = buffSize
+        self.buffs:ClearAllPoints()
+        self.buffs:SetPoint(relativePoint.."LEFT", buff, relativePoint.."LEFT", 0, -auraOffsetY)
+
+        self.spellbarAnchor2 = determineSpellbarAnchor(self, buff, "Buff", numDebuffs)
+    else
+        -- Same row, anchor to previous buff
+        self.buffRowWidth = self.buffRowWidth + buffSize + BuffSizer.db.buffOffset
+        buff:ClearAllPoints()
+        buff:SetPoint(point.."LEFT", _G[buffName..(index - 1)], point.."RIGHT", BuffSizer.db.buffOffset, 0)
+    end
+
+    -- ===========================
+    --   SHOW/HIDE STEALABLE GLOW
+    -- ===========================
+    if frameStealable then
+        local highlightOpt = BuffSizer.db[self.unit .. "HighlightStealable"]  -- e.g. targetHighlightStealable
+        if highlightOpt
+           and UnitIsEnemy("player", self.unit)
+           and isStealable
+           and debuffType == "Magic"
+        then
+            frameStealable:Show()
+            -- Optionally rescale it if you want
+            frameStealable:SetWidth(buffSize + buffSize / 7)
+            frameStealable:SetHeight(buffSize + buffSize / 7)
+        else
+            frameStealable:Hide()
+        end
+    end
+
+    -- Finally, set the buff icon’s size
+    buff:SetWidth(buffSize)
+    buff:SetHeight(buffSize)
+
+    -- Resize the buff’s border if present
+    local border = _G[buffName..index.."Border"]
+    if border then
+        border:SetWidth(buffSize + 2)
+        border:SetHeight(buffSize + 2)
+    end
 end
+
 
 local TargetFrame_UpdateDebuffAnchor_old = TargetFrame_UpdateDebuffAnchor
 TargetFrame_UpdateDebuffAnchor = function(self, buffName, index, numBuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
