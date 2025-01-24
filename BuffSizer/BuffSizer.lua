@@ -36,7 +36,7 @@ BuffSizer.defaults = {
 		targetDebuffSelfFactor = 1.1,
 		targetBuffOnTop = true,
 		--focus
-		focusHighlightStealable = false,
+		focusHighlightStealable = true,
 		focusBuffSize = 25,
 		focusBuffMaxWidth = 122,
 		focusDebuffSize = 25,
@@ -488,10 +488,10 @@ local function determineSpellbarAnchor(frame, buff, auraType, numAuras)
 end
 
 local TargetFrame_UpdateBuffAnchor_old = TargetFrame_UpdateBuffAnchor
-TargetFrame_UpdateBuffAnchor = function(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
+TargetFrame_UpdateBuffAnchor = function(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY)
     -- Only override for target/focus frames
     if not validUnits[self.unit] then
-        return TargetFrame_UpdateBuffAnchor_old(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
+        return TargetFrame_UpdateBuffAnchor_old(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY)
     end
 
     -- Calculate anchor info (same as before)
@@ -532,7 +532,7 @@ TargetFrame_UpdateBuffAnchor = function(self, buffName, index, numDebuffs, ancho
     elseif ( self.buffRowWidth + buffSize > BuffSizer.db[self.unit .. "BuffMaxWidth"] ) then
         -- Start a new row
         buff:ClearAllPoints()
-        buff:SetPoint(point.."LEFT", _G[buffName..self.buffNewRowIndex], relativePoint.."LEFT", 0, -offsetY)
+        buff:SetPoint(point.."LEFT", _G[buffName..self.buffNewRowIndex], relativePoint.."LEFT", 0, offsetY)
         self.buffRowCount = self.buffRowCount + 1
         self.buffNewRowIndex = index
         self.buffRowWidth = buffSize
@@ -580,9 +580,9 @@ end
 
 
 local TargetFrame_UpdateDebuffAnchor_old = TargetFrame_UpdateDebuffAnchor
-TargetFrame_UpdateDebuffAnchor = function(self, buffName, index, numBuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
+TargetFrame_UpdateDebuffAnchor = function(self, buffName, index, numBuffs, anchorIndex, size, offsetX, offsetY)
 	if not validUnits[self.unit] then
-		TargetFrame_UpdateDebuffAnchor_old(self, buffName, index, numBuffs, anchorIndex, size, offsetX, offsetY, mirrorVertically)
+		TargetFrame_UpdateDebuffAnchor_old(self, buffName, index, numBuffs, anchorIndex, size, offsetX, offsetY)
 		return
 	end
 
